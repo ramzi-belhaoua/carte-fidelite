@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Carte de fidélité — Chez Léo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  /* ====== À MODIFIER : vos identifiants Supabase (Project Settings > API) ====== */
+  /* Voir aussi les constantes SUPABASE_URL / SUPABASE_ANON_KEY dans le <script> plus bas */
+  :root{
+    --bg:#12211c; --paper:#efe6d2; --paper2:#e6dabf; --ink:#1c211c; --muted:#6f6a5c;
+    --gold:#c99a3b; --rust:#a2472b; --teal:#3e6e63; --stub:#c9bd9d;
+    padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--paper);font-family:Inter,system-ui,sans-serif;display:flex;justify-content:center;-webkit-font-smoothing:antialiased;}
+  .app{width:100%;max-width:480px;padding:28px 18px 60px;}
+  .brand{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:18px;}
+  .brand h1{font-family:'Space Grotesk',sans-serif;font-size:1.05rem;font-weight:600;margin:0;}
+  .brand span{font-size:.72rem;color:#9fb0a8;}
+  h2{font-family:'Space Grotesk',sans-serif;font-size:.95rem;font-weight:600;margin:30px 2px 12px;}
+  .hint{font-size:.78rem;color:#9fb0a8;margin:-8px 2px 14px;}
+  label{display:block;font-size:.78rem;color:#c9d6cf;margin:12px 2px 6px;}
+  input{width:100%;padding:11px 13px;border-radius:9px;border:1px solid #2a4a3f;background:#182f27;color:var(--paper);font-family:inherit;font-size:.9rem;}
+  input:focus{outline:2px solid var(--gold);}
+  .btn{width:100%;margin-top:18px;padding:13px;border:none;border-radius:24px;background:var(--gold);color:#1c1204;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.9rem;cursor:pointer;}
+  .btn.secondary{background:transparent;border:1px solid #3a5c50;color:var(--paper);}
+  .btn:disabled{opacity:.5;cursor:default;}
+  .switch{text-align:center;margin-top:16px;font-size:.8rem;color:#9fb0a8;}
+  .switch a{color:var(--gold);cursor:pointer;text-decoration:underline;}
+  .error{background:#3a1f1a;border:1px solid var(--rust);color:#ffd9cc;padding:10px 13px;border-radius:9px;font-size:.8rem;margin-top:14px;}
+  .card{background:var(--paper);color:var(--ink);border-radius:14px;position:relative;overflow:hidden;box-shadow:0 18px 40px -18px rgba(0,0,0,.55);}
+  .card-top{padding:22px 20px 18px;}
+  .hello{font-size:.8rem;color:var(--muted);margin:0 0 2px;}
+  .balance{display:flex;align-items:flex-end;gap:8px;margin-top:8px;}
+  .balance .num{font-family:'Space Grotesk',sans-serif;font-size:3.1rem;font-weight:700;line-height:.9;}
+  .balance .lbl{font-size:.78rem;color:var(--muted);padding-bottom:6px;}
+  .perf{height:0;border-top:2px dashed var(--stub);position:relative;}
+  .perf::before,.perf::after{content:"";position:absolute;top:-9px;width:18px;height:18px;border-radius:50%;background:var(--bg);}
+  .perf::before{left:-9px;} .perf::after{right:-9px;}
+  .card-bottom{padding:14px 20px 20px;display:flex;justify-content:space-between;align-items:center;}
+  .card-bottom .id{font-family:'Space Grotesk',sans-serif;font-size:.78rem;letter-spacing:1px;color:var(--muted);cursor:pointer;border-bottom:1px dashed var(--muted);}
+  .card-bottom .shop{font-family:'Space Grotesk',sans-serif;font-size:.85rem;font-weight:600;}
+  .actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .action{background:#182f27;border:1px solid #24443a;border-radius:12px;padding:14px 12px;text-align:left;color:var(--paper);cursor:pointer;font-family:inherit;display:flex;flex-direction:column;gap:6px;}
+  .action:active{transform:scale(.97);}
+  .action .ic{font-size:1.3rem;}
+  .action .lb{font-size:.8rem;font-weight:500;line-height:1.25;}
+  .action .pt{font-family:'Space Grotesk',sans-serif;font-size:.78rem;color:var(--gold);font-weight:600;}
+  .action[disabled]{opacity:.45;cursor:default;}
+  .reward{background:var(--paper);color:var(--ink);border-radius:12px;padding:14px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px;}
+  .reward .rl{font-size:.85rem;font-weight:500;}
+  .reward .rc{font-size:.72rem;color:var(--muted);margin-top:2px;}
+  .reward button{font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.75rem;border:none;border-radius:20px;padding:9px 14px;cursor:pointer;background:var(--teal);color:#eafff8;}
+  .reward button[disabled]{background:#cfc6ac;color:#8a8570;cursor:default;}
+  .hrow{display:flex;justify-content:space-between;padding:9px 2px;border-bottom:1px solid #1e332c;font-size:.8rem;color:#c9d6cf;}
+  .hrow span:last-child{color:var(--gold);font-family:'Space Grotesk',sans-serif;font-weight:600;}
+  .empty{color:#82938a;font-size:.8rem;padding:8px 2px;}
+  .toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);background:var(--gold);color:#1c1204;font-family:'Space Grotesk',sans-serif;font-weight:600;font-size:.85rem;padding:11px 20px;border-radius:30px;opacity:0;pointer-events:none;transition:all .28s ease;box-shadow:0 10px 24px -8px rgba(0,0,0,.5);text-align:center;max-width:90vw;}
+  .toast.show{opacity:1;transform:translate(-50%,0);}
+  .logout{background:none;border:none;color:#9fb0a8;font-size:.75rem;text-decoration:underline;cursor:pointer;padding:0;margin-top:24px;}
+  .cardnote{font-size:.72rem;color:var(--muted);margin-top:8px;}
+  .wheelbox{background:#182f27;border:1px solid #24443a;border-radius:14px;padding:18px 14px 16px;text-align:center;}
+  .wheelwrap{position:relative;width:230px;height:230px;margin:6px auto 4px;}
+  .wheelwrap svg{width:100%;height:100%;transition:transform 4.2s cubic-bezier(.12,.6,.1,1);}
+  .pointer{position:absolute;top:-8px;left:50%;transform:translateX(-50%);width:0;height:0;border-left:11px solid transparent;border-right:11px solid transparent;border-top:20px solid var(--gold);z-index:2;filter:drop-shadow(0 2px 2px rgba(0,0,0,.4));}
+  .wheelnote{font-size:.78rem;color:#9fb0a8;margin-top:10px;}
+  .win{background:var(--gold);color:#1c1204;border-radius:10px;padding:10px 12px;font-size:.82rem;font-weight:600;margin-top:12px;font-family:'Space Grotesk',sans-serif;}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="brand"><h1>Chez Léo</h1><span>Carte de fidélité</span></div>
+
+  <!-- AUTH -->
+  <div id="viewAuth">
+    <h2 id="authTitle">Connexion</h2>
+    <div id="signupFields" class="hidden">
+      <label>Prénom</label><input id="fName" placeholder="Votre prénom">
+      <label>Téléphone</label><input id="fPhone" placeholder="06 12 34 56 78">
+      <label>Date de naissance</label><input id="fBirth" type="date">
+      <label>Code de parrainage (optionnel)</label><input id="fReferral" placeholder="Ex: A1B2C3">
+    </div>
+    <label>E-mail</label><input id="fEmail" type="email" placeholder="vous@exemple.com">
+    <label>Mot de passe</label><input id="fPassword" type="password" placeholder="••••••••">
+    <button class="btn" id="btnAuth">Se connecter</button>
+    <div id="authError" class="error hidden"></div>
+    <p class="switch">Pas encore de compte ? <a id="toggleAuth">Créer un compte</a></p>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="viewDash" class="hidden">
+    <div class="card">
+      <div class="card-top">
+        <p class="hello">Bonjour, <b id="dName">–</b></p>
+        <div class="balance"><div class="num" id="ptsNum">0</div><div class="lbl">points</div></div>
+      </div>
+      <div class="perf"></div>
+      <div class="card-bottom">
+        <span class="shop">🏬 Chez Léo</span>
+        <span class="id" id="cardId" title="Montrez ce code en caisse">–</span>
+      </div>
+    </div>
+    <p class="cardnote">Montrez le code ci-dessus en caisse pour un achat, une visite, un jeu ou une promo — le commerçant l'utilise pour créditer vos points.</p>
+
+    <h2>Gagner des points</h2>
+    <p class="hint">Actions disponibles directement depuis l'appli.</p>
+    <div class="actions" id="actions"></div>
+
+    <h2>Roulette du jour 🎁</h2>
+    <div class="wheelbox">
+      <div class="wheelwrap"><div class="pointer"></div><div id="wheelSvg"></div></div>
+      <button class="btn" id="btnSpin" style="margin-top:12px">Tourner la roulette</button>
+      <div class="wheelnote" id="wheelNote">Un tirage gratuit par jour : points ou article offert.</div>
+      <div id="wheelWins"></div>
+    </div>
+
+    <h2>Parrainer un ami</h2>
+    <p class="hint" id="referralHint">Partagez votre code : <b id="referralCode">–</b> — vous gagnez 30 points dès qu'un ami s'inscrit avec.</p>
+
+    <h2>Échanger vos points</h2>
+    <div id="rewards"></div>
+
+    <h2>Historique</h2>
+    <div id="history"></div>
+
+    <button class="logout" id="btnLogout">Se déconnecter</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ====== À REMPLACER par vos vraies valeurs (Supabase > Project Settings > API) ====== */
+const SUPABASE_URL = "https://jcdjkixrrosuiaeewotg.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_btnncDVmkFmsy01a0Ji9MQ_vr20EB8J";
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const SELF_ACTIONS = [
+  {id:'instagram', icon:'📸', label:'Suivre sur Instagram', pts:15, flag:'instagram_claimed'},
+  {id:'review', icon:'⭐', label:'Donner son avis', pts:20, flag:'review_claimed'},
+  {id:'birthday', icon:'🎂', label:'Anniversaire du mois', pts:50, flag:'birthday_this_year'},
+];
+
+let session = null, profile = null;
+
+const $ = id => document.getElementById(id);
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2200);
+}
+function showError(msg){ const e=$('authError'); e.textContent = msg; e.classList.remove('hidden'); }
+function clearError(){ $('authError').classList.add('hidden'); }
+
+let mode = 'login';
+$('toggleAuth').onclick = () => {
+  mode = mode === 'login' ? 'signup' : 'login';
+  $('signupFields').classList.toggle('hidden', mode !== 'signup');
+  $('authTitle').textContent = mode === 'login' ? 'Connexion' : 'Créer un compte';
+  $('btnAuth').textContent = mode === 'login' ? 'Se connecter' : "S'inscrire";
+  $('toggleAuth').textContent = mode === 'login' ? 'Créer un compte' : 'Se connecter';
+  $('toggleAuth').previousSibling.textContent = mode === 'login' ? 'Pas encore de compte ? ' : 'Déjà un compte ? ';
+  clearError();
+};
+
+$('btnAuth').onclick = async () => {
+  clearError();
+  const email = $('fEmail').value.trim();
+  const password = $('fPassword').value;
+  if(!email || !password){ showError('E-mail et mot de passe requis.'); return; }
+  $('btnAuth').disabled = true;
+  try{
+    if(mode === 'login'){
+      const {error} = await sb.auth.signInWithPassword({email, password});
+      if(error) throw error;
+    } else {
+      const {error} = await sb.auth.signUp({
+        email, password,
+        options:{ data:{
+          name: $('fName').value.trim(),
+          phone: $('fPhone').value.trim(),
+          birth_date: $('fBirth').value,
+          referral_code_used: $('fReferral').value.trim().toUpperCase()
+        }}
+      });
+      if(error) throw error;
+      toast('Compte créé ! Vérifiez vos e-mails si la confirmation est activée.');
+    }
+    await boot();
+  }catch(err){ showError(err.message || 'Une erreur est survenue.'); }
+  $('btnAuth').disabled = false;
+};
+
+$('btnLogout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+
+async function loadProfile(){
+  const {data, error} = await sb.from('profiles').select('*').eq('id', session.user.id).single();
+  if(error){ console.error(error); return null; }
+  return data;
+}
+async function loadBalance(){
+  const {data} = await sb.from('point_transactions').select('points').eq('customer_id', session.user.id);
+  return (data||[]).reduce((s,r)=>s+r.points,0);
+}
+async function loadHistory(){
+  const {data} = await sb.from('point_transactions').select('action_id,points,note,created_at')
+    .eq('customer_id', session.user.id).order('created_at',{ascending:false}).limit(12);
+  return data || [];
+}
+async function loadRewards(){
+  const {data} = await sb.from('rewards').select('*').eq('active', true).order('cost');
+  return data || [];
+}
+
+const LABELS = {visit:'Visite en magasin',purchase:'Achat',birthday:'Anniversaire',referral:'Parrainage',
+  instagram:'Instagram',review:'Avis laissé',game:'Jeu',promo:'Promotion',redeem:'Échange récompense'};
+
+async function renderDash(){
+  $('viewAuth').classList.add('hidden');
+  $('viewDash').classList.remove('hidden');
+
+  $('dName').textContent = profile.name || 'Client';
+  $('cardId').textContent = 'N° ' + profile.id.slice(0,8).toUpperCase();
+  $('referralCode').textContent = profile.referral_code;
+
+  const balance = await loadBalance();
+  $('ptsNum').textContent = balance;
+
+  const isBirthdayMonth = profile.birth_date &&
+    new Date(profile.birth_date).getMonth() === new Date().getMonth() &&
+    profile.birthday_claimed_year !== new Date().getFullYear();
+
+  const aWrap = $('actions'); aWrap.innerHTML = '';
+  SELF_ACTIONS.forEach(a=>{
+    let done = false, visible = true;
+    if(a.id === 'instagram') done = profile.instagram_claimed;
+    if(a.id === 'review') done = profile.review_claimed;
+    if(a.id === 'birthday'){ visible = !!profile.birth_date; done = !isBirthdayMonth; }
+    if(!visible) return;
+    const btn = document.createElement('button');
+    btn.className = 'action'; btn.disabled = done;
+    btn.innerHTML = `<span class="ic">${a.icon}</span><span class="lb">${a.label}</span><span class="pt">${done?'Fait ✓':'+'+a.pts+' pts'}</span>`;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const {data, error} = await sb.rpc('claim_action', {p_action: a.id});
+      if(error){ toast(error.message); btn.disabled = false; return; }
+      toast('+'+data+' points !');
+      profile = await loadProfile();
+      renderDash();
+    };
+    aWrap.appendChild(btn);
+  });
+
+  const rewards = await loadRewards();
+  const rWrap = $('rewards'); rWrap.innerHTML = '';
+  rewards.forEach(r=>{
+    const can = balance >= r.cost;
+    const row = document.createElement('div'); row.className = 'reward';
+    row.innerHTML = `<div><div class="rl">${r.label}</div><div class="rc">${r.cost} pts</div></div>`;
+    const btn = document.createElement('button');
+    btn.textContent = can ? 'Échanger' : r.cost + ' pts'; btn.disabled = !can;
+    btn.onclick = async () => {
+      btn.disabled = true;
+      const {error} = await sb.rpc('redeem_reward', {p_reward_id: r.id});
+      if(error){ toast(error.message); btn.disabled = false; return; }
+      toast('Récompense débloquée 🎉');
+      renderDash();
+    };
+    row.appendChild(btn); rWrap.appendChild(row);
+  });
+
+  const hist = await loadHistory();
+  const hWrap = $('history'); hWrap.innerHTML = '';
+  if(hist.length === 0){ hWrap.innerHTML = '<div class="empty">Aucune activité pour l\'instant.</div>'; }
+  hist.forEach(h=>{
+    const row = document.createElement('div'); row.className = 'hrow';
+    const sign = h.points > 0 ? '+' : '';
+    row.innerHTML = `<span>${LABELS[h.action_id]||h.action_id}</span><span>${sign}${h.points}</span>`;
+    hWrap.appendChild(row);
+  });
+
+  await renderWheel();
+}
+
+/* ====== ROULETTE ====== */
+const SEGMENTS = [
+  {key:'lose',    label:'Perdu',   color:'#4a5a53'},
+  {key:'p5',      label:'5 pts',   color:'#3e6e63'},
+  {key:'p10',     label:'10 pts',  color:'#c99a3b'},
+  {key:'p20',     label:'20 pts',  color:'#a2472b'},
+  {key:'p50',     label:'50 pts',  color:'#2f5a8a'},
+  {key:'article', label:'Article', color:'#7a4a8a'},
+];
+let wheelRotation = 0, spinning = false, wheelBuilt = false;
+
+function buildWheel(){
+  if(wheelBuilt) return; wheelBuilt = true;
+  const n = SEGMENTS.length, step = 360/n, r = 100, c = 100;
+  const pt = (deg, rad) => [c + rad*Math.sin(deg*Math.PI/180), c - rad*Math.cos(deg*Math.PI/180)];
+  let paths = '';
+  SEGMENTS.forEach((s,i)=>{
+    const a0 = i*step, a1 = (i+1)*step;
+    const [x0,y0] = pt(a0,r), [x1,y1] = pt(a1,r);
+    const mid = a0 + step/2, [tx,ty] = pt(mid, r*0.64);
+    paths += `<path d="M${c},${c} L${x0},${y0} A${r},${r} 0 0 1 ${x1},${y1} Z" fill="${s.color}" stroke="#efe6d2" stroke-width="1.5"/>`;
+    paths += `<text x="${tx}" y="${ty}" fill="#fff" font-size="11" font-weight="700" text-anchor="middle" dominant-baseline="middle" transform="rotate(${mid} ${tx} ${ty})" font-family="Space Grotesk,sans-serif">${s.label}</text>`;
+  });
+  $('wheelSvg').innerHTML = `<svg id="wheelEl" viewBox="0 0 200 200">${paths}<circle cx="100" cy="100" r="9" fill="#efe6d2"/></svg>`;
+}
+
+function parisDay(d){ return new Date(d).toLocaleDateString('fr-FR',{timeZone:'Europe/Paris'}); }
+
+async function renderWheel(){
+  buildWheel();
+  const {data:spins} = await sb.from('wheel_spins').select('*')
+    .eq('customer_id', session.user.id).order('created_at',{ascending:false}).limit(20);
+  const list = spins || [];
+  const playedToday = list.length > 0 && parisDay(list[0].created_at) === parisDay(new Date());
+  $('btnSpin').disabled = playedToday || spinning;
+  $('btnSpin').textContent = playedToday ? 'Revenez demain !' : 'Tourner la roulette';
+  $('wheelNote').textContent = playedToday
+    ? 'Vous avez déjà joué aujourd\'hui.'
+    : 'Un tirage gratuit par jour : points ou article offert.';
+  const pending = list.filter(s => s.prize_key === 'article' && !s.redeemed);
+  $('wheelWins').innerHTML = pending.map(()=>
+    '<div class="win">🎁 Article offert à retirer en magasin — montrez cet écran en caisse.</div>').join('');
+}
+
+$('btnSpin').onclick = async () => {
+  if(spinning) return;
+  spinning = true; $('btnSpin').disabled = true;
+  const {data, error} = await sb.rpc('spin_wheel');
+  if(error){ spinning = false; toast(error.message); await renderWheel(); return; }
+  const idx = Math.max(0, SEGMENTS.findIndex(s => s.key === data.key));
+  const step = 360/SEGMENTS.length;
+  const jitter = (Math.random()-0.5) * (step*0.6);
+  const base = Math.ceil(wheelRotation/360)*360;
+  wheelRotation = base + 360*5 + (360 - (idx*step + step/2)) + jitter;
+  $('wheelEl').style.transform = `rotate(${wheelRotation}deg)`;
+  setTimeout(async () => {
+    spinning = false;
+    if(data.key === 'lose') toast('Perdu... retentez demain !');
+    else if(data.key === 'article') toast('🎉 Vous avez gagné un article !');
+    else toast('🎉 +' + data.points + ' points !');
+    await renderDash();
+  }, 4400);
+};
+
+async function boot(){
+  const {data:{session:s}} = await sb.auth.getSession();
+  session = s;
+  if(!session){ $('viewAuth').classList.remove('hidden'); $('viewDash').classList.add('hidden'); return; }
+  profile = await loadProfile();
+  if(!profile){ toast('Erreur de chargement du profil.'); return; }
+  await renderDash();
+}
+boot();
+</script>
+</body>
+</html>
