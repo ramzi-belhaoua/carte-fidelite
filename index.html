@@ -320,7 +320,9 @@ async function renderWheel(){
   const {data:spins} = await sb.from('wheel_spins').select('*')
     .eq('customer_id', session.user.id).order('created_at',{ascending:false}).limit(20);
   const list = spins || [];
-  const playedToday = list.length > 0 && parisDay(list[0].created_at) === parisDay(new Date());
+  const {data:st} = await sb.from('app_settings').select('value').eq('key','wheel_unlimited').maybeSingle();
+  const unlimited = !!st && st.value === 'true';
+  const playedToday = !unlimited && list.length > 0 && parisDay(list[0].created_at) === parisDay(new Date());
   $('btnSpin').disabled = playedToday || spinning;
   $('btnSpin').textContent = playedToday ? 'Revenez demain !' : 'Tourner la roulette';
   $('wheelNote').textContent = playedToday
