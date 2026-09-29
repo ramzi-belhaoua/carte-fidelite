@@ -71,26 +71,31 @@
   .wheelnote{font-size:.78rem;color:#9fb0a8;margin-top:10px;}
   .win{background:var(--gold);color:#1c1204;border-radius:10px;padding:10px 12px;font-size:.82rem;font-weight:600;margin-top:12px;font-family:'Space Grotesk',sans-serif;}
   .hidden{display:none !important;}
+  .overlay{position:fixed;inset:0;background:rgba(8,12,10,.62);display:flex;align-items:center;justify-content:center;padding:20px;z-index:30;}
+  .overlay .card{padding:22px 20px;max-width:400px;width:100%;box-shadow:0 24px 50px -20px rgba(0,0,0,.6);}
+  .overlay h2{margin:0 0 6px;}
+  .overlay .hint{color:var(--muted);margin:0 0 14px;}
+  .overlay label{color:var(--muted);}
+  .overlay input{background:#fff;border:1px solid #cfc6ac;color:var(--ink);}
+  .reset{background:none;border:none;color:#5b6b63;font-size:.72rem;text-decoration:underline;cursor:pointer;padding:0;margin-top:30px;}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="brand"><h1>Chez Léo</h1><span>Carte de fidélité</span></div>
 
-  <!-- AUTH -->
-  <div id="viewAuth">
-    <h2 id="authTitle">Connexion</h2>
-    <div id="signupFields" class="hidden">
-      <label>Prénom</label><input id="fName" placeholder="Votre prénom">
-      <label>Téléphone</label><input id="fPhone" placeholder="06 12 34 56 78">
-      <label>Date de naissance</label><input id="fBirth" type="date">
-      <label>Code de parrainage (optionnel)</label><input id="fReferral" placeholder="Ex: A1B2C3">
+  <!-- ENREGISTREMENT (affiché après les premiers points gagnés) -->
+  <div id="regOverlay" class="overlay hidden">
+    <div class="card">
+      <h2>Enregistrer vos points 🎉</h2>
+      <p class="hint">Bravo, vous venez de gagner des points ! Laissez vos coordonnées pour qu'ils restent liés à votre carte.</p>
+      <label>Prénom</label><input id="rName" placeholder="Votre prénom">
+      <label>Téléphone</label><input id="rPhone" placeholder="06 12 34 56 78">
+      <label>Date de naissance (pour votre cadeau d'anniversaire)</label><input id="rBirth" type="date">
+      <label>Code de parrainage (optionnel)</label><input id="rReferral" placeholder="Ex: A1B2C3">
+      <button class="btn" id="btnRegister">Valider</button>
+      <div id="regError" class="error hidden"></div>
     </div>
-    <label>E-mail</label><input id="fEmail" type="email" placeholder="vous@exemple.com">
-    <label>Mot de passe</label><input id="fPassword" type="password" placeholder="••••••••">
-    <button class="btn" id="btnAuth">Se connecter</button>
-    <div id="authError" class="error hidden"></div>
-    <p class="switch">Pas encore de compte ? <a id="toggleAuth">Créer un compte</a></p>
   </div>
 
   <!-- DASHBOARD -->
@@ -129,15 +134,15 @@
     <h2>Historique</h2>
     <div id="history"></div>
 
-    <button class="logout" id="btnLogout">Se déconnecter</button>
+    <button class="reset" id="btnReset">Réinitialiser ma carte (test)</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
 
 <script>
 /* ====== À REMPLACER par vos vraies valeurs (Supabase > Project Settings > API) ====== */
-const SUPABASE_URL = "https://jcdjkixrrosuiaeewotg.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_btnncDVmkFmsy01a0Ji9MQ_vr20EB8J";
+const SUPABASE_URL = "https://VOTRE-PROJET.supabase.co";
+const SUPABASE_ANON_KEY = "VOTRE_CLE_ANON_PUBLIQUE";
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -154,49 +159,50 @@ function toast(msg){
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
   clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove('show'), 2200);
 }
-function showError(msg){ const e=$('authError'); e.textContent = msg; e.classList.remove('hidden'); }
-function clearError(){ $('authError').classList.add('hidden'); }
+function showRegError(msg){ const e=$('regError'); e.textContent = msg; e.classList.remove('hidden'); }
+function clearRegError(){ $('regError').classList.add('hidden'); }
 
-let mode = 'login';
-$('toggleAuth').onclick = () => {
-  mode = mode === 'login' ? 'signup' : 'login';
-  $('signupFields').classList.toggle('hidden', mode !== 'signup');
-  $('authTitle').textContent = mode === 'login' ? 'Connexion' : 'Créer un compte';
-  $('btnAuth').textContent = mode === 'login' ? 'Se connecter' : "S'inscrire";
-  $('toggleAuth').textContent = mode === 'login' ? 'Créer un compte' : 'Se connecter';
-  $('toggleAuth').previousSibling.textContent = mode === 'login' ? 'Pas encore de compte ? ' : 'Déjà un compte ? ';
-  clearError();
-};
-
-$('btnAuth').onclick = async () => {
-  clearError();
-  const email = $('fEmail').value.trim();
-  const password = $('fPassword').value;
-  if(!email || !password){ showError('E-mail et mot de passe requis.'); return; }
-  $('btnAuth').disabled = true;
+$('btnRegister').onclick = async () => {
+  clearRegError();
+  const name = $('rName').value.trim();
+  const phone = $('rPhone').value.trim();
+  const birth = $('rBirth').value;
+  const referral = $('rReferral').value.trim().toUpperCase();
+  if(!name || !phone){ showRegError('Prénom et téléphone requis.'); return; }
+  $('btnRegister').disabled = true;
   try{
-    if(mode === 'login'){
-      const {error} = await sb.auth.signInWithPassword({email, password});
-      if(error) throw error;
-    } else {
-      const {error} = await sb.auth.signUp({
-        email, password,
-        options:{ data:{
-          name: $('fName').value.trim(),
-          phone: $('fPhone').value.trim(),
-          birth_date: $('fBirth').value,
-          referral_code_used: $('fReferral').value.trim().toUpperCase()
-        }}
-      });
-      if(error) throw error;
-      toast('Compte créé ! Vérifiez vos e-mails si la confirmation est activée.');
+    const {error} = await sb.rpc('update_my_profile', {p_name:name, p_phone:phone, p_birth_date: birth || null});
+    if(error) throw error;
+    if(referral){
+      const {error:refErr} = await sb.rpc('apply_referral', {p_code: referral});
+      if(refErr) toast(refErr.message);
     }
-    await boot();
-  }catch(err){ showError(err.message || 'Une erreur est survenue.'); }
-  $('btnAuth').disabled = false;
+    $('regOverlay').classList.add('hidden');
+    toast('Merci ' + name + ' ! Vos points sont enregistrés.');
+    profile = await loadProfile();
+    await renderDash();
+  }catch(err){ showRegError(err.message || 'Erreur, réessayez.'); }
+  $('btnRegister').disabled = false;
 };
 
-$('btnLogout').onclick = async () => { await sb.auth.signOut(); location.reload(); };
+$('btnReset').onclick = async () => {
+  if(!confirm('Cela crée une nouvelle carte vierge sur cet appareil. Les points actuels resteront enregistrés côté commerçant mais vous n\'y aurez plus accès depuis ce téléphone. Continuer ?')) return;
+  await sb.auth.signOut();
+  location.reload();
+};
+
+function maybeShowRegistration(hasActivity){
+  if(!profile.name && hasActivity){ $('regOverlay').classList.remove('hidden'); }
+  else { $('regOverlay').classList.add('hidden'); }
+}
+
+async function ensureSession(){
+  const {data:{session:s0}} = await sb.auth.getSession();
+  if(s0) return s0;
+  const {data, error} = await sb.auth.signInAnonymously();
+  if(error){ toast('Connexion impossible : ' + error.message); return null; }
+  return data.session;
+}
 
 async function loadProfile(){
   const {data, error} = await sb.from('profiles').select('*').eq('id', session.user.id).single();
@@ -221,7 +227,6 @@ const LABELS = {visit:'Visite en magasin',purchase:'Achat',birthday:'Anniversair
   instagram:'Instagram',review:'Avis laissé',game:'Jeu',promo:'Promotion',redeem:'Échange récompense'};
 
 async function renderDash(){
-  $('viewAuth').classList.add('hidden');
   $('viewDash').classList.remove('hidden');
 
   $('dName').textContent = profile.name || 'Client';
@@ -284,6 +289,7 @@ async function renderDash(){
     hWrap.appendChild(row);
   });
 
+  maybeShowRegistration(balance > 0 || hist.length > 0);
   await renderWheel();
 }
 
@@ -354,9 +360,8 @@ $('btnSpin').onclick = async () => {
 };
 
 async function boot(){
-  const {data:{session:s}} = await sb.auth.getSession();
-  session = s;
-  if(!session){ $('viewAuth').classList.remove('hidden'); $('viewDash').classList.add('hidden'); return; }
+  session = await ensureSession();
+  if(!session) return;
   profile = await loadProfile();
   if(!profile){ toast('Erreur de chargement du profil.'); return; }
   await renderDash();
